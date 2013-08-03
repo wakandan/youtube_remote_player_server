@@ -2,6 +2,7 @@ import bottle
 from bottle import route, run, template, response
 import subprocess
 import shlex 
+import os
 from subprocess import Popen, PIPE
 
 class EnableCors(object):
@@ -65,22 +66,24 @@ def play(url=''):
     global download_pipe 
     global mp3_pipe 
     
+    print 'playing video id: '+url
+    
     playlist.append(url)
     current_song = url 
 
     if download_pipe is not None:
         download_pipe.terminate()
-    download_pipe = Popen(['python', './youtube2mp3_converter.py', url], stdout=PIPE) 
-    playing_check = download_pipe.poll()
-    if playing_check is not None or playing_check!=0:
-        return 'error while getting the file'         
+    print os.getcwd()+'/youtube2mp3_converter.py'
+    download_pipe = Popen(['python', os.getcwd()+'/youtube2mp3_converter.py', url], stdout=PIPE) 
 
     if mp3_pipe is not None:
         mp3_pipe.terminate()
     mp3_pipe = Popen(shlex.split('mpg123 -'), stdin=download_pipe.stdout)   
     playing_check = mp3_pipe.poll()
     if playing_check is not None or playing_check!=0:
+        print 'error while playing the file'
         return 'error while playing the file'
+    print 'playing...'
     return "playing..." 
 
 app.install(EnableCors())
