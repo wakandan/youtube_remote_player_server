@@ -19,12 +19,10 @@ YOUTUBE2_MP3_LINK3 = "http://www.youtube-mp3.org/get?video_id=%s&h=%s"
 
 
 class Player:
-    '''player maintain a playlist. The song to be played will always be on the playlist's head.
-    when a song finishes playing, it's poped out of the list and the playing contains from 
-    the next song
-    '''
+    '''player maintain a playlist.  '''
     def __init__(self):    
         self.playlist = []
+        self.current_song = 0
                             
         #this only works with playbin2
         self.player = gst.element_factory_make("playbin2", "player")
@@ -39,26 +37,28 @@ class Player:
     def on_about_to_finish(self, player):
         '''The current song is about to finish, if we want to play another
         song after this, we have to do that now'''
-
-        self.playlist.pop(0)
-        #we'll just repeat the song here as an example
-        if len(self.playlist)>0:
-            player.set_property("uri", self.playlist[0])
+        self.play_next()
 
     def stop(self):
         self.player.set_state(gst.STATE_READY)
 
     def play_next(self):
-        if len(self.playlist)>1:
-            self.playlist.pop(0)
-            song_url = self.playlist[0]
+        '''play the next song if available'''
+        if self.current_song<len(self.playlist):
+            self.current_song += 1
+            song_url = self.playlist[self.current_song]
             self.stop()
             self.player.set_property('uri', song_url)
             self.player.set_state(gst.STATE_PLAYING)
-        else: 
-            self.playlist = []
-            self.stop()
             
+    def play_prev(self):
+        '''play the previous song if there's any'''
+        if self.current_song>0 and len(self.playlist)>0:
+            self.current_song -= 1
+            song_url = self.playlist[self.current_song]
+            self.stop()
+            self.player.set_property('uri', song_url)
+            self.player.set_state(gst.STATE_PLAYING)
 
     def get_mp3_link(self, video_id):
         '''get mp3 link from a youtube video id using youtube2mp3 service'''
@@ -186,6 +186,11 @@ def play(video_id=''):
 def next():
     global player
     player.play_next()
+
+@route('/prev', method=['OPTIONS', 'GET'])
+def next():
+    global player
+    player.play_prev()
 
 app = bottle.app()
 app.install(EnableCors())
