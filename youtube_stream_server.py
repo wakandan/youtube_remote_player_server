@@ -23,6 +23,8 @@ class Player:
     def __init__(self):    
         self.playlist = []
         self.current_song = 0
+        self.songIdCache = {}
+        self.songLinkCache = {}
                             
         #this only works with playbin2
         self.player = gst.element_factory_make("playbin2", "player")
@@ -44,7 +46,7 @@ class Player:
 
     def play_next(self):
         '''play the next song if available'''
-        if self.current_song<len(self.playlist):
+        if self.current_song<len(self.playlist)-1:
             self.current_song += 1
             song_url = self.playlist[self.current_song]
             self.stop()
@@ -72,14 +74,40 @@ class Player:
         if result is not None:
             hash_value = result.group(0)
             final_download_link =  YOUTUBE2_MP3_LINK3 % (video_id, hash_value)
+            self.songIdCache[final_download_link] = video_id
+            self.songLinkCache[video_id] = final_download_link
             return final_download_link
         else:
             return None
 
+    def get_playing(self):
+        if self.current_song<len(self.playlist):
+            return self.songIdCache[self.playlist[self.current_song]]
+        return None   
+
     def add_song_id(self, song_id):         
         '''add a song into this playlist, return false if not possible'''
 
-        song_url = self.get_mp3_link(song_id)
+        #this song has been added before?
+        if song_id in self.songLinkCache.keys(): 
+            song_link = self.songLinkCache[song_id]
+            #is it the song being played? yes then do nothing
+            if song_link == self.playlist[self.current_song]:
+                return True
+            elif song_link in self.playlist: 
+                #if this song is in playlist, then play that song instead
+                self.current_song = self.playlist.index(song_link)
+                self.stop()
+                self.player.set_property('uri', song_link)
+                self.player.set_state(gst.STATE_PLAYING)
+                return True
+            else: 
+                #it been enquired but not added to the playlist, then 
+                #just proceed to the next step 
+                song_url = song_link
+        else: #this song is not added before, query the mp3 link
+            song_url = self.get_mp3_link(song_id)
+
         print 'adding song id ',song_id
         if song_url == None:
             print 'unable to get mp3 link for song id', song_id
@@ -95,6 +123,12 @@ class Player:
                 print 'adding, not playing'
                 print 'current playlist', self.playlist
             return True
+    def get_playlist_ids(self):
+        result = []
+        for link in self.playlist: 
+            if link in self.songIdCache.keys():
+                result.append(self.songIdCache[link])
+        return result
 
 
 #creates a playbin (plays media form an uri) 
@@ -170,7 +204,7 @@ def check():
 @route('/playlist', method=['OPTIONS', 'GET'])
 def get_playlist():   
     global player 
-    return {'playlist': player.playlist}
+    return {'playlist': player.get_playlist_ids(), 'playing': player.get_playing()}
 
 
 @route('/play/<video_id>', method=['OPTIONS', 'GET'])
